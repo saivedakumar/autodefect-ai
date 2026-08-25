@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from github import Auth, Github
+from github import Auth, Github, GithubException
 from github.PullRequest import PullRequest as GhPullRequest
 
 from .config import get_settings
@@ -54,7 +54,20 @@ class GitHubClient:
 
     def post_review(self, pr_number: int, body: str, approve: bool) -> None:
         pr = self.get_pull_request(pr_number)
-        pr.create_review(body=body, event="APPROVE" if approve else "REQUEST_CHANGES")
+        event = "APPROVE" if approve else "REQUEST_CHANGES"
+        try:
+            pr.create_review(body=body, event=event)
+        except GithubException as exc:
+            # GitHub refuses APPROVE/REQUEST_CHANGES from the PR author's own
+            # token (e.g. the reviewer bot and PR author share credentials, as
+            # in a single-account demo). Fall back to a plain comment so the
+            # verdict is still visible; a distinct reviewer identity in
+            # production won't hit this branch.
+            if exc.status == 422 and "own pull request" in str(exc.data):
+                prefix = "**AI review verdict: APPROVE**" if approve else "**AI review verdict: REQUEST CHANGES**"
+                pr.create_issue_comment(f"{prefix}\n\n{body}")
+            else:
+                raise
 
     def merge_pr(self, pr_number: int) -> None:
         pr = self.get_pull_request(pr_number)
