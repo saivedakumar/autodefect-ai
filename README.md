@@ -104,5 +104,54 @@ curl -X POST http://127.0.0.1:8000/retests/run -H "Content-Type: application/jso
 
 ```bash
 pytest tests/unit                  # LangGraph node logic, mocked LLM/GitHub
+pytest tests/integration           # full Raise->Review->Merge->Retest->Close loop,
+                                    # fake GitHub/Ollama, no token/model/runner needed
 pytest tests/playwright            # demo app specs (needs demo_app running on :8001)
 ```
+
+`tests/integration/test_full_loop.py` drives the real FastAPI app and real
+LangGraph graphs through the entire lifecycle - including the failure path
+(a failing retest reopens the defect instead of closing it) and the
+rejected-review path (no merge happens) - using fakes for GitHub and Ollama.
+It's the fastest way to confirm the pipeline's own logic is wired correctly
+before setting up real credentials and a runner.
+
+## Verifying the framework end-to-end
+
+**Without any external services** (proves the pipeline logic itself is correct):
+
+```bash
+pytest tests/unit tests/integration -v
+```
+
+All 10 tests should pass. This exercises every stage of the diagram - raise,
+review, merge, retest, close - with GitHub and Ollama replaced by fakes.
+
+**With the demo app, but still no GitHub/Ollama** (proves the seeded bugs are
+real and the fixes actually work):
+
+```bash
+uvicorn demo_app.main:app --port 8001 &
+pytest tests/playwright -v   # all 3 should FAIL - the bugs are live
+```
+
+Then apply a fix from the `# BUG-n` comments in `demo_app/main.py`, restart the
+server, and re-run the matching spec - it should now pass.
+
+**With real GitHub + Ollama + the self-hosted runner** (the full live loop):
+
+1. Complete the setup in section 1-3 above (PAT, runner, `ollama pull`, both
+   services running).
+2. `python scripts/seed_defects.py` and note the 3 issue numbers it prints.
+3. Confirm each issue exists on GitHub (labeled `defect`) and each row exists
+   via `curl http://127.0.0.1:8000/defects`.
+4. Fix one bug, push a branch, open a PR with `Fixes #<n>` in the body.
+5. Watch the runner's terminal (`run.cmd`) - `ai-pr-review.yml` should start
+   within a few seconds of opening the PR. Check the PR on GitHub for the
+   posted AI review, and confirm it auto-merges on approval.
+6. Watch for `ai-retest.yml` to fire on the merge to `main`. Confirm the
+   linked GitHub issue closes with the AI's summary comment, and that
+   `curl http://127.0.0.1:8000/defects/<id>` shows `"status": "closed"`.
+7. As a negative-path check, open a second PR that does *not* actually fix its
+   bug - the review agent should request changes (no auto-merge), or the
+   retest agent should reopen the issue if it slips through.

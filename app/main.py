@@ -1,15 +1,18 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from .db.database import init_db
 from .routers import defects, retests, reviews
 
-app = FastAPI(title="AutoDefect AI")
 
-
-@app.on_event("startup")
-def on_startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
+    yield
 
+
+app = FastAPI(title="AutoDefect AI", lifespan=lifespan)
 
 app.include_router(defects.router)
 app.include_router(reviews.router)

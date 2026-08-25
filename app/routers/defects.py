@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from ..db import models
@@ -16,14 +16,13 @@ class RaiseDefectRequest(BaseModel):
 
 
 class DefectResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     github_issue_number: int
     slug: str | None
     title: str
     status: str
-
-    class Config:
-        from_attributes = True
 
 
 @router.post("", response_model=DefectResponse)
