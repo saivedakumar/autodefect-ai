@@ -19,8 +19,8 @@ def index(request: Request):
 @app.post("/todos")
 def add_todo(title: str = Form(...)):
     global _next_id
-    # BUG-1 (defect slug: empty_title): no validation - blank/whitespace-only
-    # titles are accepted instead of being rejected.
+    if not title.strip():
+        return RedirectResponse("/", status_code=303)
     _todos.append({"id": _next_id, "title": title, "done": False})
     _next_id += 1
     return RedirectResponse("/", status_code=303)
