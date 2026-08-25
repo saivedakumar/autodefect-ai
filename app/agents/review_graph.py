@@ -11,15 +11,24 @@ from .llm import ask_json
 from .state import ReviewState
 
 REVIEW_PROMPT = """You are an automated code reviewer for a defect-fix pull request.
+Decide only whether the diff below correctly fixes the defect described in the issue.
 
-Linked defect / issue context:
+Defect / issue:
 {issue_context}
 
-Pull request diff:
+Pull request diff (unified format - lines starting with "+" are added, "-" are removed):
 {diff}
 
-Review the diff for correctness, whether it plausibly fixes the described defect,
-and any obvious bugs or regressions. Respond with ONLY a JSON object of the form:
+Steps:
+1. Identify the exact "+" lines in the diff that change the code's behavior.
+2. Check whether those exact lines implement the fix the issue's "Expected" behavior
+   describes. Do not assume a fix is missing just because the diff is short.
+3. If they do implement it, approve must be true. If they don't, or introduce a new
+   bug, approve must be false.
+Your "summary" text MUST agree with your "approve" value - never write a summary
+describing a correct fix while setting approve to false, or vice versa.
+
+Respond with ONLY a JSON object of this exact form, no other text:
 {{"approve": true|false, "summary": "one paragraph summary", "comments": ["comment1", "comment2"]}}
 """
 
