@@ -1,0 +1,22 @@
+name: AI PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  ai-review:
+    runs-on: [self-hosted, ai-pipeline]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Call AI review service
+        shell: bash
+        env:
+          SERVICE_TOKEN: ${{ secrets.AUTODEFECT_SERVICE_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          curl -sf -X POST "http://127.0.0.1:8000/reviews/run" \
+            -H "Content-Type: application/json" \
+            -H "X-Service-Token: $SERVICE_TOKEN" \
+            -d "{\"pr_number\": $PR_NUMBER}"

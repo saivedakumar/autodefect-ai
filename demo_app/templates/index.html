@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Demo Todo App</title>
+</head>
+<body>
+  <h1>Todos</h1>
+
+  <form method="post" action="/todos">
+    <input type="text" name="title" data-testid="new-todo-input" />
+    <button type="submit" data-testid="add-todo-button">Add</button>
+  </form>
+
+  <ul data-testid="todo-list">
+    {% for todo in todos %}
+    <li data-testid="todo-item" data-todo-id="{{ todo.id }}">
+      <span
+        data-testid="todo-title"
+        style="{{ 'text-decoration: line-through;' if todo.done else '' }}"
+      >{{ todo.title }}</span>
+
+      <form method="post" action="/todos/{{ todo.id }}/toggle" style="display:inline">
+        <button type="submit" data-testid="toggle-todo-button">
+          {{ 'Undo' if todo.done else 'Complete' }}
+        </button>
+      </form>
+
+      <form method="post" action="/todos/{{ todo.id }}/delete" style="display:inline">
+        <button type="submit" data-testid="delete-todo-button">Delete</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</body>
+</html>

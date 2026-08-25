@@ -1,0 +1,35 @@
+name: AI Retest
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  ai-retest:
+    runs-on: [self-hosted, ai-pipeline]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find the merged PR for this push
+        id: find_pr
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=$(gh pr list --state merged --search "${{ github.sha }}" --json number,mergeCommit \
+            --jq ".[] | select(.mergeCommit.oid == \"${{ github.sha }}\") | .number" | head -n1)
+          if [ -z "$PR_NUMBER" ]; then
+            PR_NUMBER=$(gh pr list --state merged --limit 1 --json number --jq ".[0].number")
+          fi
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Call AI retest service
+        shell: bash
+        env:
+          SERVICE_TOKEN: ${{ secrets.AUTODEFECT_SERVICE_TOKEN }}
+          PR_NUMBER: ${{ steps.find_pr.outputs.pr_number }}
+        run: |
+          curl -sf -X POST "http://127.0.0.1:8000/retests/run" \
+            -H "Content-Type: application/json" \
+            -H "X-Service-Token: $SERVICE_TOKEN" \
+            -d "{\"pr_number\": $PR_NUMBER}"
